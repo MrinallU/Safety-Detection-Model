@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torchvision import transforms
 import os
 from PIL import Image
+from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
 
 
 class LSTM(nn.Module):
@@ -202,13 +203,78 @@ def eval(
         embeddings = torch.cat(embeddings, dim=0).unsqueeze(0)
         labels = torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
 
+
+def eval(
+    csv_path="safety_detection_labeled_data/Safety_Detection_Labeled.csv",
+    images_folder="safety_detection_labeled_data/",
+    vae_weights="vae_weights.pth",
+    lstm_weights="lstm_weights.pth",
+    seq_len=32,
+):
+    data = load_data(
+        csv_path=csv_path, images_folder=images_folder, vae_weights=vae_weights
+    )
+    model = LSTM()
+    checkpoint = torch.load(lstm_weights, weights_only=False)
+    model.load_state_dict(checkpoint)
+    model.eval()
+
+    all_preds = []
+    all_labels = []
+    for i in range(0, len(data), 1):
+        if i + seq_len == len(data):
+            break
+        batch = data[i : i + seq_len]
+
+        embeddings = [item["embedding"] for item in batch]
+        labels = [item["label"] for item in batch]
+
+        embeddings = torch.cat(embeddings, dim=0).unsqueeze(0)
+        labels = torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
+
         # Forward pass
         outputs = model.forward(embeddings)
         last_time_step = outputs[-1, -1, 0]
+        pred_label = 1.0 if last_time_step > 0.5 else 0.0
+        true_label = labels[0, -1, 0].item()
+
+        # Collect predictions & labels for metric computation
+        all_preds.append(pred_label)
+        all_labels.append(true_label)
 
         crit = nn.BCELoss()
         loss = crit(last_time_step, labels[0, -1, 0])
-        print(f"Loss: {loss}, Output: {last_time_step}, Label: {labels[0, -1, 0]}")
+        # print(f"Loss: {loss}, Prediction: {pred_label}, Label: {true_label}")
+
+    # Once done collecting over the entire dataset, compute metrics:
+    all_preds_tensor = torch.tensor(all_preds)
+    all_labels_tensor = torch.tensor(all_labels)
+
+    accuracy = accuracy_score(all_labels_tensor, all_preds_tensor)
+    f1 = f1_score(all_labels_tensor, all_preds_tensor, zero_division=0)
+
+    # confusion_matrix returns a 2x2 matrix in the format:
+    # [[TN, FP],
+    #  [FN, TP]]
+    tn, fp, fn, tp = confusion_matrix(all_labels_tensor, all_preds_tensor).ravel()
+
+    # False Positive Rate (FPR) = FP / (FP + TN)
+    if (fp + tn) == 0:
+        fpr = 0.0
+    else:
+        fpr = fp / (fp + tn)
+
+    # False Negative Rate (FNR) = FN / (FN + TP)
+    if (fn + tp) == 0:
+        fnr = 0.0
+    else:
+        fnr = fn / (fn + tp)
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"F1 Score: {f1:.4f}")
+    print(f"False Positive Rate: {fpr:.4f}")
+    print(f"False Negaitve Rate: {fnr:.4f}")
+
+    return accuracy, f1, fpr
 
 
 if __name__ == "__main__":
