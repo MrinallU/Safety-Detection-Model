@@ -65,7 +65,6 @@ class LSTM(nn.Module):
         # Shuffle data if desired
         # import random
         # random.shuffle(data)
-
         # Process the data
         for i in range(0, len(data), 1):
             if i + seq_len == len(data):
@@ -117,7 +116,9 @@ class LSTM(nn.Module):
         :param lr: learning rate
         """
         optimizer = optim.Adam(self.parameters(), lr=lr)
-
+        print(f"Original Size: {len(data)}")
+        data = data[0:4000]  # Train first 5000
+        print(f"New Size: {len(data)}")
         for epoch in range(epochs):
             epoch_loss = self.train_one_epoch(data, optimizer, device)
             print(f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss:.4f}")
@@ -187,33 +188,8 @@ def eval(
     data = load_data(
         csv_path=csv_path, images_folder=images_folder, vae_weights=vae_weights
     )
-    model = LSTM()
-    checkpoint = torch.load(lstm_weights, weights_only=False)
-    model.load_state_dict(checkpoint)
-    model.eval()
 
-    for i in range(0, len(data), 1):
-        if i + seq_len == len(data):
-            break
-        batch = data[i : i + seq_len]
-
-        embeddings = [item["embedding"] for item in batch]
-        labels = [item["label"] for item in batch]
-
-        embeddings = torch.cat(embeddings, dim=0).unsqueeze(0)
-        labels = torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
-
-
-def eval(
-    csv_path="safety_detection_labeled_data/Safety_Detection_Labeled.csv",
-    images_folder="safety_detection_labeled_data/",
-    vae_weights="vae_weights.pth",
-    lstm_weights="lstm_weights.pth",
-    seq_len=32,
-):
-    data = load_data(
-        csv_path=csv_path, images_folder=images_folder, vae_weights=vae_weights
-    )
+    data = data[4000:-1]  # Eval last 5000
     model = LSTM()
     checkpoint = torch.load(lstm_weights, weights_only=False)
     model.load_state_dict(checkpoint)
@@ -278,4 +254,10 @@ def eval(
 
 
 if __name__ == "__main__":
+    # Training
+    # data = load_data()
+    # model = LSTM()
+    # model.train_model(data=data)
+
+    # Validation Metrics
     eval()
