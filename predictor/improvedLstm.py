@@ -50,7 +50,7 @@ class LSTM(nn.Module):
 
         return probabilities
 
-    def train_one_epoch(self, data, optimizer, device, seq_len=32):
+    def train_one_epoch(self, data, optimizer, device, seq_len=32, horizon=10):
         """
         :param data: list of dictionaries from load_data()
         :param optimizer: PyTorch optimizer
@@ -62,19 +62,18 @@ class LSTM(nn.Module):
         criterion = nn.BCELoss(reduction="sum")
         running_loss = 0.0
 
-        # Shuffle data if desired
-        # import random
-        # random.shuffle(data)
-        # Process the data
         for i in range(0, len(data), 1):
-            if i + seq_len == len(data):
+            if i + seq_len + horizon >= len(data):
                 break
-            batch = data[i : i + seq_len]
+
+            batch = data[i : i + seq_len + horizon]
 
             embeddings = [
-                item["embedding"] for item in batch
+                item["embedding"] for item in batch[0 : len(batch) - horizon]
             ]  # each is shape [1, latent_size]
-            labels = [item["label"] for item in batch]  # each is 0 or 1
+            labels = []
+            for i in range(len(batch) - horizon):
+                labels.append(batch[i + horizon]["label"])
 
             # Concatenate embeddings along dim=0 => shape: [seq_len, latent_size]
             # (assuming each embedding is shape [1, 32])
@@ -106,7 +105,9 @@ class LSTM(nn.Module):
 
         return epoch_loss
 
-    def train_model(self, data, device="cpu", epochs=20, lr=1e-3):
+    def train_model(
+        self, data, device="cpu", seq_len=32, horizon=10, epochs=40, lr=1e-3
+    ):
         """
         Main training loop.
 
@@ -116,14 +117,16 @@ class LSTM(nn.Module):
         :param lr: learning rate
         """
         optimizer = optim.Adam(self.parameters(), lr=lr)
-        print(f"Original Size: {len(data)}")
+        # print(f"Original Size: {len(data)}")
         data = data[0:4000]  # Train first 5000
-        print(f"New Size: {len(data)}")
+        # print(f"New Size: {len(data)}")
+        best_train_loss = 10000
         for epoch in range(epochs):
-            epoch_loss = self.train_one_epoch(data, optimizer, device)
+            epoch_loss = self.train_one_epoch(data, optimizer, device, seq_len, horizon)
             print(f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss:.4f}")
-
-        torch.save(self.state_dict(), "lstm_weights.pth")
+            if epoch_loss < best_train_loss:
+                best_train_loss = epoch_loss
+                torch.save(self.state_dict(), "lstm_weights_pred.pth")
 
 
 def load_image(filepath):
@@ -182,28 +185,39 @@ def eval(
     csv_path="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/Safety_Detection_Labeled.csv",
     images_folder="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/",
     vae_weights="vae_weights.pth",
-    lstm_weights="lstm_weights.pth",
+    lstm_weights="lstm_weights_pred.pth",
     seq_len=32,
+    horizon=10,
+    load_lstm_weights=True,
+    load_d=True,
+    data=None,
 ):
-    data = load_data(
-        csv_path=csv_path, images_folder=images_folder, vae_weights=vae_weights
-    )
+    if load_d:
+        data = load_data(
+            csv_path=csv_path, images_folder=images_folder, vae_weights=vae_weights
+        )
 
     data = data[4000:-1]  # Eval last 5000
     model = LSTM()
-    checkpoint = torch.load(lstm_weights, weights_only=False)
-    model.load_state_dict(checkpoint)
+    if load_lstm_weights:
+        checkpoint = torch.load(lstm_weights, weights_only=False)
+        model.load_state_dict(checkpoint)
     model.eval()
 
     all_preds = []
     all_labels = []
     for i in range(0, len(data), 1):
-        if i + seq_len == len(data):
+        if i + seq_len + horizon >= len(data):
             break
-        batch = data[i : i + seq_len]
 
-        embeddings = [item["embedding"] for item in batch]
-        labels = [item["label"] for item in batch]
+        batch = data[i : i + seq_len + horizon]
+
+        embeddings = [
+            item["embedding"] for item in batch[0 : len(batch) - horizon]
+        ]  # each is shape [1, latent_size]
+        labels = []
+        for i in range(len(batch) - horizon):
+            labels.append(batch[i + horizon]["label"])
 
         embeddings = torch.cat(embeddings, dim=0).unsqueeze(0)
         labels = torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
@@ -250,14 +264,34 @@ def eval(
     print(f"False Positive Rate: {fpr:.4f}")
     print(f"False Negaitve Rate: {fnr:.4f}")
 
-    return accuracy, f1, fpr
+    return accuracy, f1, fpr, fnr
 
 
 if __name__ == "__main__":
+    # Grid Search
+    # Hyperparameters
+    lens = [32]
+    horizon_init = 10
+    horizon_increment = 10
+    horizon_limit = 90
     # Training
     data = load_data()
+    print("DATA loaded")
     model = LSTM()
-    model.train_model(data=data)
+    for h in range(horizon_init, horizon_limit, horizon_increment):
+        for l in lens:
+            print(f"Results for Horizon {h} and Sequence Length {l}:")
+            print("_______________________________________________")
+            model.train_model(data=data, seq_len=l, horizon=h)
+            acc, f1, fpr, fnr = eval(load_lstm_weights=True, load_d=False, data=data)
+            with open("results.txt", "a") as file:
+                file.write(f"Results for Horizon {h} and Sequence Length {l}:\n")
+                file.write("_______________________________________________\n")
+                file.write(f"Accuracy: {acc:.4f} \n")
+                file.write(f"F1 Score: {f1:.4f} \n")
+                file.write(f"False Positive Rate: {fpr:.4f}\n")
+                file.write(f"False Negative Rate: {fnr:.4f}\n")
 
-    # Validation Metrics
-    eval()
+    # Basic Train/Test
+    # model.train_model(data=data)
+    # eval(load_lstm_weights=True, load_d=True)

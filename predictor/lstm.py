@@ -1,14 +1,20 @@
 import torch
 import pandas as pd
 import torch.optim as optim
-import numpy as np
 from vae import VAE
 import torch.nn as nn
-import torch.nn.functional as F
 from torchvision import transforms
+import torch.nn.functional as F
 import os
 from PIL import Image
-from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    confusion_matrix,
+    precision_score,
+    recall_score,
+    mean_squared_error,
+)
 
 
 class LSTM(nn.Module):
@@ -106,7 +112,7 @@ class LSTM(nn.Module):
         return epoch_loss
 
     def train_model(
-        self, data, device="cpu", seq_len=32, horizon=10, epochs=20, lr=1e-3
+        self, data, device="cpu", seq_len=32, horizon=10, epochs=30, lr=1e-3
     ):
         """
         Main training loop.
@@ -120,14 +126,15 @@ class LSTM(nn.Module):
         # print(f"Original Size: {len(data)}")
         data = data[0:4000]  # Train first 5000
         # print(f"New Size: {len(data)}")
-        finLoss = -1
+        finLoss = 1000
         for epoch in range(epochs):
             epoch_loss = self.train_one_epoch(data, optimizer, device, seq_len, horizon)
+            if finLoss > epoch_loss:
+                finLoss = epoch_loss
+                torch.save(self.state_dict(), "lstm_weights_pred.pth")
             # print(f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss:.4f}")
-            finLoss = epoch_loss
 
         print(f"Loss: {finLoss:.4f}")
-        torch.save(self.state_dict(), "lstm_weights_pred.pth")
 
 
 def load_image(filepath):
@@ -198,7 +205,9 @@ def eval(
             csv_path=csv_path, images_folder=images_folder, vae_weights=vae_weights
         )
 
-    data = data[4000:-1]  # Eval last 5000
+    # Evaluate on the last 5000 samples (skipping the first 4000)
+    data = data[4000:-1]
+
     model = LSTM()
     if load_lstm_weights:
         checkpoint = torch.load(lstm_weights, weights_only=False)
@@ -207,89 +216,101 @@ def eval(
 
     all_preds = []
     all_labels = []
+
     for i in range(0, len(data), 1):
         if i + seq_len + horizon >= len(data):
             break
 
         batch = data[i : i + seq_len + horizon]
 
-        embeddings = [
-            item["embedding"] for item in batch[0 : len(batch) - horizon]
-        ]  # each is shape [1, latent_size]
-        labels = []
-        for i in range(len(batch) - horizon):
-            labels.append(batch[i + horizon]["label"])
+        # Gather the embeddings for the input sequence
+        embeddings = [item["embedding"] for item in batch[0 : len(batch) - horizon]]
+        embeddings = torch.cat(embeddings, dim=0).unsqueeze(
+            0
+        )  # Shape: [1, seq_len, latent_size]
 
-        embeddings = torch.cat(embeddings, dim=0).unsqueeze(0)
+        # Gather the label we want to predict (the label "horizon" steps ahead)
+        labels = []
+        for j in range(len(batch) - horizon):
+            labels.append(batch[j + horizon]["label"])
         labels = torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
 
-        # Forward pass
-        outputs = model.forward(embeddings)
-        last_time_step = outputs[-1, -1, 0]
+        # Forward pass through LSTM
+        outputs = model.forward(
+            embeddings
+        )  # Shape: [1, seq_len, 1] or [batch, seq_len, 1]
+
+        # Get the predicted probability from the last time step
+        last_time_step = outputs[-1, -1, 0]  # shape scalar
+        # Convert probability to binary prediction
         pred_label = 1.0 if last_time_step > 0.5 else 0.0
         true_label = labels[0, -1, 0].item()
 
-        # Collect predictions & labels for metric computation
         all_preds.append(pred_label)
         all_labels.append(true_label)
 
-        crit = nn.BCELoss()
-        loss = crit(last_time_step, labels[0, -1, 0])
-        # print(f"Loss: {loss}, Prediction: {pred_label}, Label: {true_label}")
-
-    # Once done collecting over the entire dataset, compute metrics:
+    # COMPUTE METRICS
     all_preds_tensor = torch.tensor(all_preds)
     all_labels_tensor = torch.tensor(all_labels)
 
     accuracy = accuracy_score(all_labels_tensor, all_preds_tensor)
     f1 = f1_score(all_labels_tensor, all_preds_tensor, zero_division=0)
 
-    # confusion_matrix returns a 2x2 matrix in the format:
-    # [[TN, FP],
-    #  [FN, TP]]
+    # Confusion matrix
     tn, fp, fn, tp = confusion_matrix(all_labels_tensor, all_preds_tensor).ravel()
-
-    # False Positive Rate (FPR) = FP / (FP + TN)
     if (fp + tn) == 0:
         fpr = 0.0
     else:
         fpr = fp / (fp + tn)
-
-    # False Negative Rate (FNR) = FN / (FN + TP)
     if (fn + tp) == 0:
         fnr = 0.0
     else:
         fnr = fn / (fn + tp)
-    print(f"Accuracy: {accuracy:.4f}")
-    print(f"F1 Score: {f1:.4f}")
-    print(f"False Positive Rate: {fpr:.4f}")
-    print(f"False Negaitve Rate: {fnr:.4f}")
 
-    return accuracy, f1, fpr, fnr
+    precision = precision_score(all_labels_tensor, all_preds_tensor, zero_division=0)
+    recall = recall_score(all_labels_tensor, all_preds_tensor, zero_division=0)
+
+    mse_val = mean_squared_error(all_labels_tensor, all_preds_tensor)
+
+    print(f"Accuracy:            {accuracy:.4f}")
+    print(f"F1 Score:            {f1:.4f}")
+    print(f"Precision:           {precision:.4f}")
+    print(f"Recall:              {recall:.4f}")
+    print(f"False Positive Rate: {fpr:.4f}")
+    print(f"False Negative Rate: {fnr:.4f}")
+    print(f"MSE:                 {mse_val:.4f}")
+
+    return accuracy, f1, fpr, fnr, precision, recall, mse_val
 
 
 if __name__ == "__main__":
     # Grid Search
     # Hyperparameters
-    lens = [32, 52, 72, 92]
-    horizon_init = 10
-    horizon_increment = 10
-    horizon_limit = 91
+    lens = [32]
+    horizon_init = 60
+    horizon_increment = 5
+    horizon_limit = 100
     # Training
     data = load_data()
+    print("DATA loaded")
     model = LSTM()
-
-    for h in range(horizon_init, horizon_limit, horizon_increment):
+    for h in range(horizon_init, horizon_limit + 1, horizon_increment):
         for l in lens:
-            model.train_model(data=data, seq_len=l, horizon=h)
             print(f"Results for Horizon {h} and Sequence Length {l}:")
             print("_______________________________________________")
-            acc, f1, fpr, fnr = eval(load_lstm_weights=True, load_d=False, data=data)
+            model.train_model(data=data, seq_len=l, horizon=h)
+            acc, f1, fpr, fnr, p, r, mse = eval(
+                load_lstm_weights=True, load_d=False, data=data, horizon=h, seq_len=l
+            )
             with open("results.txt", "a") as file:
                 file.write(f"Results for Horizon {h} and Sequence Length {l}:\n")
                 file.write("_______________________________________________\n")
                 file.write(f"Accuracy: {acc:.4f} \n")
                 file.write(f"F1 Score: {f1:.4f} \n")
+                file.write(f"Precision: {p: .4f}\n")
+                file.write(f"Recall: {r: .4f}\n")
+                file.write(f"MSE: {mse: .4f}\n")
+                # file.write(f"ssim: {ssim: .4f}\n")
                 file.write(f"False Positive Rate: {fpr:.4f}\n")
                 file.write(f"False Negative Rate: {fnr:.4f}\n")
 
