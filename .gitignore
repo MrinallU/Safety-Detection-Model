@@ -1,2 +1,3 @@
 safety_detection_labeled_data/
 safety_detection_labeled_data.zip
+*.pth
