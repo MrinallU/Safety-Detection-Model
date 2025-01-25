@@ -78,8 +78,8 @@ class LSTM(nn.Module):
                 item["embedding"] for item in batch[0 : len(batch) - horizon]
             ]  # each is shape [1, latent_size]
             labels = []
-            for i in range(len(batch) - horizon):
-                labels.append(batch[i + horizon]["label"])
+            for j in range(len(batch) - horizon):
+                labels.append(batch[j + horizon]["label"])
 
             # Concatenate embeddings along dim=0 => shape: [seq_len, latent_size]
             # (assuming each embedding is shape [1, 32])
@@ -213,7 +213,8 @@ def eval(
         checkpoint = torch.load(lstm_weights, weights_only=False)
         model.load_state_dict(checkpoint)
     model.eval()
-
+    tot = 0
+    lblOne = 0
     all_preds = []
     all_labels = []
 
@@ -245,6 +246,8 @@ def eval(
         # Convert probability to binary prediction
         pred_label = 1.0 if last_time_step > 0.5 else 0.0
         true_label = labels[0, -1, 0].item()
+        tot += 1
+        lblOne += pred_label
 
         all_preds.append(pred_label)
         all_labels.append(true_label)
@@ -271,7 +274,7 @@ def eval(
     recall = recall_score(all_labels_tensor, all_preds_tensor, zero_division=0)
 
     mse_val = mean_squared_error(all_labels_tensor, all_preds_tensor)
-
+    print(f"Percent Unsafe: {lblOne / tot} Total Predictions: {tot}")
     print(f"Accuracy:            {accuracy:.4f}")
     print(f"F1 Score:            {f1:.4f}")
     print(f"Precision:           {precision:.4f}")
@@ -287,8 +290,8 @@ if __name__ == "__main__":
     # Grid Search
     # Hyperparameters
     lens = [32]
-    horizon_init = 60
-    horizon_increment = 5
+    horizon_init = 0
+    horizon_increment = 20
     horizon_limit = 100
     # Training
     data = load_data()

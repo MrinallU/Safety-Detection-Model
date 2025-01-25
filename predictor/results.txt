@@ -1,144 +1,37 @@
+
 Results for Horizon 0 and Sequence Length 32:
 _______________________________________________
-Accuracy: 0.9283 
-F1 Score: 0.9371 
-Precision:  0.9142
-Recall:  0.9612
-MSE:  0.0717
-False Positive Rate: 0.1129
-False Negative Rate: 0.0388
-Results for Horizon 5 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.8590 
-F1 Score: 0.8782 
-Precision:  0.8463
-Recall:  0.9126
-MSE:  0.1410
-False Positive Rate: 0.2086
-False Negative Rate: 0.0874
-Results for Horizon 10 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.8846 
-F1 Score: 0.8977 
-Precision:  0.8885
-Recall:  0.9070
-MSE:  0.1154
-False Positive Rate: 0.1436
-False Negative Rate: 0.0930
-Results for Horizon 15 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.8247 
-F1 Score: 0.8457 
-Precision:  0.8310
-Recall:  0.8610
-MSE:  0.1753
-False Positive Rate: 0.2212
-False Negative Rate: 0.1390
+Accuracy: 0.9379 
+F1 Score: 0.9457 
+Precision:  0.9200
+Recall:  0.9730
+MSE:  0.0621
+False Positive Rate: 0.1060
+False Negative Rate: 0.0270
 Results for Horizon 20 and Sequence Length 32:
 _______________________________________________
-Accuracy: 0.8208 
-F1 Score: 0.8436 
-Precision:  0.8215
-Recall:  0.8668
-MSE:  0.1792
-False Positive Rate: 0.2371
-False Negative Rate: 0.1332
-Results for Horizon 25 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.8100 
-F1 Score: 0.8307 
-Precision:  0.8238
-Recall:  0.8376
-MSE:  0.1900
-False Positive Rate: 0.2248
-False Negative Rate: 0.1624
-Results for Horizon 30 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.7729 
-F1 Score: 0.8031 
-Precision:  0.7758
-Recall:  0.8324
-MSE:  0.2271
-False Positive Rate: 0.3017
-False Negative Rate: 0.1676
-Results for Horizon 35 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.7565 
-F1 Score: 0.8010 
-Precision:  0.7351
-Recall:  0.8800
-MSE:  0.2435
-False Positive Rate: 0.3989
-False Negative Rate: 0.1200
+Accuracy: 0.8263 
+F1 Score: 0.8571 
+Precision:  0.7912
+Recall:  0.9351
+MSE:  0.1737
+False Positive Rate: 0.3108
+False Negative Rate: 0.0649
 Results for Horizon 40 and Sequence Length 32:
 _______________________________________________
-Accuracy: 0.7313 
-F1 Score: 0.7806 
-Precision:  0.7172
-Recall:  0.8561
-MSE:  0.2687
-False Positive Rate: 0.4264
-False Negative Rate: 0.1439
-Results for Horizon 45 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.7351 
-F1 Score: 0.7752 
-Precision:  0.7372
-Recall:  0.8174
-MSE:  0.2649
-False Positive Rate: 0.3692
-False Negative Rate: 0.1826
-Results for Horizon 50 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.7932 
-F1 Score: 0.8243 
-Precision:  0.7860
-Recall:  0.8666
-MSE:  0.2068
-False Positive Rate: 0.3003
-False Negative Rate: 0.1334
+Accuracy: 0.7724 
+F1 Score: 0.8056 
+Precision:  0.7698
+Recall:  0.8449
+MSE:  0.2276
+False Positive Rate: 0.3191
+False Negative Rate: 0.1551
 Results for Horizon 60 and Sequence Length 32:
 _______________________________________________
-Accuracy: 0.7343 
-F1 Score: 0.7780 
-Precision:  0.7296
-Recall:  0.8332
-MSE:  0.2657
-False Positive Rate: 0.3909
-False Negative Rate: 0.1668
-Results for Horizon 65 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.7271 
-F1 Score: 0.7703 
-Precision:  0.7258
-Recall:  0.8206
-MSE:  0.2729
-False Positive Rate: 0.3909
-False Negative Rate: 0.1794
-Results for Horizon 70 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.7095 
-F1 Score: 0.7497 
-Precision:  0.7205
-Recall:  0.7815
-MSE:  0.2905
-False Positive Rate: 0.3810
-False Negative Rate: 0.2185
-Results for Horizon 75 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.7121 
-F1 Score: 0.7477 
-Precision:  0.7291
-Recall:  0.7671
-MSE:  0.2879
-False Positive Rate: 0.3569
-False Negative Rate: 0.2329
-Results for Horizon 80 and Sequence Length 32:
-_______________________________________________
-Accuracy: 0.6944 
-F1 Score: 0.7249 
-Precision:  0.7244
-Recall:  0.7254
-MSE:  0.3056
-False Positive Rate: 0.3444
-False Negative Rate: 0.2746
+Accuracy: 0.7418 
+F1 Score: 0.7853 
+Precision:  0.7333
+Recall:  0.8452
+MSE:  0.2582
+False Positive Rate: 0.3891
+False Negative Rate: 0.1548
