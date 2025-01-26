@@ -1,0 +1,9 @@
+Results for Horizon 0 and Sequence Length 32:
+_______________________________________________
+MSE:  149.6218
+Results for Horizon 0 and Sequence Length 32:
+_______________________________________________
+MSE:  149.6218
+Results for Horizon 0 and Sequence Length 32:
+_______________________________________________
+MSE:  149.6218

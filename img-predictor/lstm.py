@@ -1,4 +1,5 @@
 import torch
+import time
 import pandas as pd
 import torch.optim as optim
 from vae import VAE
@@ -8,6 +9,8 @@ import torch.nn.functional as F
 import os
 from PIL import Image
 from sklearn.metrics import mean_squared_error
+from PIL import Image
+from torchvision.transforms import ToPILImage
 
 
 class LSTM(nn.Module):
@@ -164,6 +167,7 @@ def eval(
     data=None,
     device="cpu",
 ):
+    criterion = nn.MSELoss(reduction="sum")
     if load_d:
         data = load_data(
             csv_path=csv_path,
@@ -172,17 +176,20 @@ def eval(
             device=device,
         )
 
-    data = data[4000:-1]
+    data = data[1:50]
     model = LSTM().to(device)
 
     if load_lstm_weights:
-        checkpoint = torch.load(lstm_weights, map_location=device)
+        checkpoint = torch.load(lstm_weights, map_location=device, weights_only=True)
         model.load_state_dict(checkpoint)
     model.eval()
 
+    output_folder = "saved_images"
+    os.makedirs(output_folder, exist_ok=True)
+    to_pil = ToPILImage()
+
     all_preds = []
     all_imgs = []
-
     for i in range(0, len(data), 1):
         if i + seq_len + horizon >= len(data):
             break
@@ -196,12 +203,22 @@ def eval(
 
         outputs = model.forward(embeddings)
         last_time_step = outputs[-1]
-        true_image = images[0, -1]
+
+        true_image = images[-1, -1]
+        pil_image = to_pil(true_image.cpu())  # Convert tensor to PIL Image
+        image_path = os.path.join(output_folder, f"true_image_{i}.png")
+        pil_image.save(image_path)
+
+        pil_image = to_pil(last_time_step.cpu())  # Convert tensor to PIL Image
+        image_path = os.path.join(output_folder, f"model_image_{i}.png")
+        pil_image.save(image_path)
 
         all_preds.append(last_time_step)
         all_imgs.append(true_image)
 
-    mse_val = mean_squared_error(torch.tensor(all_imgs), torch.tensor(all_preds))
+    val_tensor = torch.stack(all_imgs)
+    model_tensor = torch.stack(all_preds)
+    mse_val = criterion(val_tensor, model_tensor)
 
     print(f"MSE: {mse_val:.4f}")
     return mse_val
@@ -221,7 +238,7 @@ if __name__ == "__main__":
         for l in lens:
             print(f"Results for Horizon {h} and Sequence Length {l}:")
             print("_______________________________________________")
-            model.train_model(data=data, seq_len=l, horizon=h, device=device)
+            # model.train_model(data=data, seq_len=l, horizon=h, device=device)
             mse = eval(
                 load_lstm_weights=True,
                 load_d=False,
