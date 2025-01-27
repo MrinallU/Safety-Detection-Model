@@ -61,7 +61,6 @@ class LSTM(nn.Module):
         :param data: list of dictionaries from load_data()
         :param optimizer: PyTorch optimizer
         :param device: 'cuda' or 'cpu'
-        :param batch_size: how many samples per update step
         :return: average loss over the epoch
         """
         self.train()
@@ -82,22 +81,25 @@ class LSTM(nn.Module):
                 labels.append(batch[j + horizon]["label"])
 
             # Concatenate embeddings along dim=0 => shape: [seq_len, latent_size]
-            # (assuming each embedding is shape [1, 32])
             embeddings = torch.cat(embeddings, dim=0).unsqueeze(
                 0
-            )  # now shape [batch_size=1,seq_len, 32]
+            )  # now shape [batch_size=1, seq_len, 32]
+            embeddings = embeddings.to(device)
 
-            # Convert labels to a tensor of shape [batch = 1,seq_len, 1]
-            labels = torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
+            # Convert labels to a tensor of shape [batch = 1, seq_len, 1]
+            labels = (
+                torch.tensor(labels, dtype=torch.float32)
+                .unsqueeze(1)
+                .unsqueeze(0)
+                .to(device)
+            )
 
             # Forward pass
-            outputs = self.forward(embeddings)  # shape [seq_len, 1]
+            outputs = self.forward(embeddings)  # shape [1, seq_len, 1]
             last_time_step = outputs[-1, -1, 0]
 
             optimizer.zero_grad()
             loss = criterion(last_time_step, labels[0, -1, 0])
-            # print(f"loss {loss}, {last_time_step}, {labels[0, -1, 0]}")
-            # print(labels[0, -1, 0])
 
             # Backprop
             loss.backward()
@@ -118,14 +120,15 @@ class LSTM(nn.Module):
         Main training loop.
 
         :param device: torch.device (e.g., 'cuda' or 'cpu')
-        :param train_loader: a DataLoader of (images, labels)
+        :param data: list of dictionaries from load_data()
         :param epochs: number of epochs to train
         :param lr: learning rate
         """
+        # Move LSTM model to the proper device
+        self.to(device)
+
         optimizer = optim.Adam(self.parameters(), lr=lr)
-        # print(f"Original Size: {len(data)}")
         data = data[0:4000]  # Train first 5000
-        # print(f"New Size: {len(data)}")
         finLoss = 1000
         for epoch in range(epochs):
             epoch_loss = self.train_one_epoch(data, optimizer, device, seq_len, horizon)
@@ -147,15 +150,17 @@ def load_image(filepath):
 
 
 def load_data(
-    csv_path="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/Safety_Detection_Labeled.csv",
-    images_folder="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/",
+    csv_path="../safety_detection_labeled_data/Safety_Detection_Labeled.csv",
+    images_folder="../safety_detection_labeled_data/",
     vae_weights="vae_weights.pth",
+    device="cpu",
 ):
     df = pd.read_csv(csv_path)
 
     model = VAE(latent_size=32)
-    checkpoint = torch.load(vae_weights, weights_only=False)
+    checkpoint = torch.load(vae_weights, map_location=device)
     model.load_state_dict(checkpoint)
+    model.to(device)
     model.eval()
 
     data = []
@@ -175,23 +180,22 @@ def load_data(
         # Load and process the image
         x = load_image(img_path)  # shape [C, H, W]
         # Reshape to add batch dimension => shape [1, C, H, W]
-        x = x.unsqueeze(0)
+        x = x.unsqueeze(0).to(device)
 
         # Encode with the VAE
         with torch.no_grad():
             output, logvar = model.encode(x)
         data.append({
             "filename": filename,
-            "embedding": output,  # or output_np
+            "embedding": output.cpu(),  # or keep it on GPU if you prefer
             "label": label,
         })
-        # print(data)
     return data
 
 
 def eval(
-    csv_path="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/Safety_Detection_Labeled.csv",
-    images_folder="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/",
+    csv_path="../safety_detection_labeled_data/Safety_Detection_Labeled.csv",
+    images_folder="../safety_detection_labeled_data/",
     vae_weights="vae_weights.pth",
     lstm_weights="lstm_weights_pred.pth",
     seq_len=32,
@@ -199,10 +203,14 @@ def eval(
     load_lstm_weights=True,
     load_d=True,
     data=None,
+    device="cpu",
 ):
     if load_d:
         data = load_data(
-            csv_path=csv_path, images_folder=images_folder, vae_weights=vae_weights
+            csv_path=csv_path,
+            images_folder=images_folder,
+            vae_weights=vae_weights,
+            device=device,
         )
 
     # Evaluate on the last 5000 samples (skipping the first 4000)
@@ -210,9 +218,11 @@ def eval(
 
     model = LSTM()
     if load_lstm_weights:
-        checkpoint = torch.load(lstm_weights, weights_only=False)
+        checkpoint = torch.load(lstm_weights, map_location=device)
         model.load_state_dict(checkpoint)
+    model.to(device)
     model.eval()
+
     tot = 0
     lblOne = 0
     all_preds = []
@@ -226,23 +236,26 @@ def eval(
 
         # Gather the embeddings for the input sequence
         embeddings = [item["embedding"] for item in batch[0 : len(batch) - horizon]]
-        embeddings = torch.cat(embeddings, dim=0).unsqueeze(
-            0
-        )  # Shape: [1, seq_len, latent_size]
+        embeddings = (
+            torch.cat(embeddings, dim=0).unsqueeze(0).to(device)
+        )  # [1, seq_len, latent_size]
 
         # Gather the label we want to predict (the label "horizon" steps ahead)
         labels = []
         for j in range(len(batch) - horizon):
             labels.append(batch[j + horizon]["label"])
-        labels = torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
+        labels = (
+            torch.tensor(labels, dtype=torch.float32)
+            .unsqueeze(1)
+            .unsqueeze(0)
+            .to(device)
+        )
 
         # Forward pass through LSTM
-        outputs = model.forward(
-            embeddings
-        )  # Shape: [1, seq_len, 1] or [batch, seq_len, 1]
+        outputs = model.forward(embeddings)  # Shape: [1, seq_len, 1]
 
         # Get the predicted probability from the last time step
-        last_time_step = outputs[-1, -1, 0]  # shape scalar
+        last_time_step = outputs[-1, -1, 0]
         # Convert probability to binary prediction
         pred_label = 1.0 if last_time_step > 0.5 else 0.0
         true_label = labels[0, -1, 0].item()
@@ -287,23 +300,32 @@ def eval(
 
 
 if __name__ == "__main__":
+    # Decide on the device manually (you can also just do str(device) in train_model/eval calls)
+    device_choice = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # Grid Search
     # Hyperparameters
     lens = [32]
     horizon_init = 0
     horizon_increment = 20
     horizon_limit = 100
+
     # Training
-    data = load_data()
+    data = load_data(device=device_choice)
     print("DATA loaded")
     model = LSTM()
     for h in range(horizon_init, horizon_limit + 1, horizon_increment):
         for l in lens:
             print(f"Results for Horizon {h} and Sequence Length {l}:")
             print("_______________________________________________")
-            model.train_model(data=data, seq_len=l, horizon=h)
+            model.train_model(data=data, device=device_choice, seq_len=l, horizon=h)
             acc, f1, fpr, fnr, p, r, mse = eval(
-                load_lstm_weights=True, load_d=False, data=data, horizon=h, seq_len=l
+                load_lstm_weights=True,
+                load_d=False,
+                data=data,
+                horizon=h,
+                seq_len=l,
+                device=device_choice,
             )
             with open("results.txt", "a") as file:
                 file.write(f"Results for Horizon {h} and Sequence Length {l}:\n")
@@ -313,10 +335,9 @@ if __name__ == "__main__":
                 file.write(f"Precision: {p: .4f}\n")
                 file.write(f"Recall: {r: .4f}\n")
                 file.write(f"MSE: {mse: .4f}\n")
-                # file.write(f"ssim: {ssim: .4f}\n")
                 file.write(f"False Positive Rate: {fpr:.4f}\n")
                 file.write(f"False Negative Rate: {fnr:.4f}\n")
 
     # Basic Train/Test
-    # model.train_model(data=data)
-    # eval(load_lstm_weights=True, load_d=True)
+    # model.train_model(data=data, device=device_choice)
+    # eval(load_lstm_weights=True, load_d=True, device=device_choice)
