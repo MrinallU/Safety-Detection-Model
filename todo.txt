@@ -1,5 +1,2 @@
-1. Convert file paths to relative 
-2. Add gpu support
-3. Retrain VAE(s) with a train/test split?? 
-4. Hipergator
-5. Test multiple horizons img-predicor.
+1. Retrain VAE(s) with a train/test split 
+2. Test multiple horizons img-predicor.
