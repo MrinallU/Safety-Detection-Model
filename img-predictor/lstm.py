@@ -34,23 +34,11 @@ class LSTM(nn.Module):
 
         lstm_output_size = lstm_units * (2 if bidirectional else 1)
 
-        # Decoder layers
-        self.dec_fc = nn.Linear(lstm_output_size, 256 * 14 * 14)
-        self.dec_conv1 = nn.ConvTranspose2d(
-            256, 128, kernel_size=4, stride=2, padding=1
-        )
-        self.dec_conv2 = nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1)
-        self.dec_conv3 = nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1)
-        self.dec_conv4 = nn.ConvTranspose2d(32, 3, kernel_size=4, stride=2, padding=1)
+        self.dense = nn.Linear(lstm_output_size, 32)
 
     def forward(self, x):
         x, _ = self.lstm(x)
-        x = self.dec_fc(x)
-        x = x.view(-1, 256, 14, 14)
-        x = F.relu(self.dec_conv1(x))
-        x = F.relu(self.dec_conv2(x))
-        x = F.relu(self.dec_conv3(x))
-        x = F.sigmoid(self.dec_conv4(x))
+        x = self.dense(x)
         return x
 
     def train_one_epoch(self, data, optimizer, device, seq_len=32, horizon=10):
@@ -67,19 +55,20 @@ class LSTM(nn.Module):
             embeddings = [
                 item["embedding"].to(device) for item in batch[0 : len(batch) - horizon]
             ]
-            images = [
-                batch[j + horizon]["image"].to(device)
+            future_embeddings = [
+                batch[j + horizon]["embedding"].to(device)
                 for j in range(len(batch) - horizon)
             ]
 
             embeddings = torch.cat(embeddings, dim=0).unsqueeze(0).to(device)
-            images = torch.cat(images, dim=0).unsqueeze(0).to(device)
+            future_embeddings = (
+                torch.cat(future_embeddings, dim=0).unsqueeze(0).to(device)
+            )
 
             outputs = self.forward(embeddings)
-            last_time_step = outputs[-1]
 
             optimizer.zero_grad()
-            loss = criterion(last_time_step, images[0, -1])
+            loss = criterion(outputs, future_embeddings)
 
             loss.backward()
             optimizer.step()
@@ -126,7 +115,7 @@ def load_data(
     df = pd.read_csv(csv_path)
 
     model = VAE(latent_size=32).to(device)
-    checkpoint = torch.load(vae_weights, map_location=device)
+    checkpoint = torch.load(vae_weights, map_location=device, weights_only=True)
     model.load_state_dict(checkpoint)
     model.eval()
 
@@ -167,7 +156,7 @@ def eval(
     data=None,
     device="cpu",
 ):
-    criterion = nn.MSELoss(reduction="sum")
+    criterion = nn.MSELoss()
     if load_d:
         data = load_data(
             csv_path=csv_path,
@@ -176,20 +165,25 @@ def eval(
             device=device,
         )
 
-    data = data[1:50]
+    data = data[4000:4100]
     model = LSTM().to(device)
+
+    vae = VAE(latent_size=32).to(device)
+    checkpoint = torch.load(vae_weights, map_location=device, weights_only=True)
+    vae.load_state_dict(checkpoint)
+    vae.eval()
 
     if load_lstm_weights:
         checkpoint = torch.load(lstm_weights, map_location=device, weights_only=True)
         model.load_state_dict(checkpoint)
     model.eval()
-
-    output_folder = "saved_images"
-    os.makedirs(output_folder, exist_ok=True)
-    to_pil = ToPILImage()
+    to_pil = transforms.ToPILImage()
 
     all_preds = []
-    all_imgs = []
+    all_outs = []
+    index1 = 0
+    index2 = 0
+
     for i in range(0, len(data), 1):
         if i + seq_len + horizon >= len(data):
             break
@@ -198,26 +192,41 @@ def eval(
         embeddings = [item["embedding"] for item in batch[0 : len(batch) - horizon]]
         embeddings = torch.cat(embeddings, dim=0).unsqueeze(0).to(device)
 
-        images = [batch[j + horizon]["image"] for j in range(len(batch) - horizon)]
-        images = torch.cat(images, dim=0).unsqueeze(0).to(device)
+        future_embeddings = [
+            batch[j + horizon]["embedding"] for j in range(len(batch) - horizon)
+        ]
+        future_embeddings = torch.cat(future_embeddings, dim=0).unsqueeze(0).to(device)
 
         outputs = model.forward(embeddings)
-        last_time_step = outputs[-1]
 
-        true_image = images[-1, -1]
-        pil_image = to_pil(true_image.cpu())  # Convert tensor to PIL Image
-        image_path = os.path.join(output_folder, f"true_image_{i}.png")
-        pil_image.save(image_path)
+        # SAVE IMAGES
+        # decoded_outputs = vae.decode(outputs)
+        # decoded_tensor = vae.decode(future_embeddings)  # shape [3, 224, 224]
 
-        pil_image = to_pil(last_time_step.cpu())  # Convert tensor to PIL Image
-        image_path = os.path.join(output_folder, f"model_image_{i}.png")
-        pil_image.save(image_path)
+        # for tensor in decoded_tensor:
+        #     img = to_pil(tensor)
+        #     img_filename = f"decoded_image_{index1}.png"
+        #     img_path = os.path.join("actual_images", img_filename)
+        #     img.save(img_path)
+        #     index1 += 1
 
-        all_preds.append(last_time_step)
-        all_imgs.append(true_image)
+        # for tensor in decoded_outputs:
+        #     img = to_pil(tensor)
+        #     img_filename = f"decoded_image_{index2}.png"
+        #     img_path = os.path.join("pred_images", img_filename)
+        #     img.save(img_path)
+        #     index2 += 1
 
-    val_tensor = torch.stack(all_imgs)
+        future_embeddings = future_embeddings[0]
+        outputs = outputs[0]
+        # print(f"{outputs.shape} {future_embeddings.shape}")
+
+        all_preds.append(outputs)
+        all_outs.append(future_embeddings)
+
+    val_tensor = torch.stack(all_outs)
     model_tensor = torch.stack(all_preds)
+
     mse_val = criterion(val_tensor, model_tensor)
 
     print(f"MSE: {mse_val:.4f}")
@@ -227,7 +236,7 @@ def eval(
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     lens = [32]
-    horizon_init = 0
+    horizon_init = 10
     horizon_increment = 5
     horizon_limit = 100
     # Training
@@ -238,7 +247,7 @@ if __name__ == "__main__":
         for l in lens:
             print(f"Results for Horizon {h} and Sequence Length {l}:")
             print("_______________________________________________")
-            # model.train_model(data=data, seq_len=l, horizon=h, device=device)
+            model.train_model(data=data, seq_len=l, horizon=h, device=device, epochs=10)
             mse = eval(
                 load_lstm_weights=True,
                 load_d=False,

@@ -55,7 +55,6 @@ class LSTM(nn.Module):
         :param data: list of dictionaries from load_data()
         :param optimizer: PyTorch optimizer
         :param device: 'cuda' or 'cpu'
-        :param batch_size: how many samples per update step
         :return: average loss over the epoch
         """
         self.train()
@@ -65,6 +64,7 @@ class LSTM(nn.Module):
         # Shuffle data if desired
         # import random
         # random.shuffle(data)
+
         # Process the data
         for i in range(0, len(data), 1):
             if i + seq_len == len(data):
@@ -77,22 +77,23 @@ class LSTM(nn.Module):
             labels = [item["label"] for item in batch]  # each is 0 or 1
 
             # Concatenate embeddings along dim=0 => shape: [seq_len, latent_size]
-            # (assuming each embedding is shape [1, 32])
             embeddings = torch.cat(embeddings, dim=0).unsqueeze(
                 0
-            )  # now shape [batch_size=1,seq_len, 32]
+            )  # shape [1, seq_len, in_features]
+            labels = (
+                torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
+            )  # [1, seq_len, 1]
 
-            # Convert labels to a tensor of shape [batch = 1,seq_len, 1]
-            labels = torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
+            # Move tensors to the correct device
+            embeddings = embeddings.to(device)
+            labels = labels.to(device)
 
             # Forward pass
-            outputs = self.forward(embeddings)  # shape [seq_len, 1]
+            outputs = self.forward(embeddings)  # shape [1, seq_len, 1]
             last_time_step = outputs[-1, -1, 0]
 
             optimizer.zero_grad()
             loss = criterion(last_time_step, labels[0, -1, 0])
-            # print(f"loss {loss}, {last_time_step}, {labels[0, -1, 0]}")
-            # print(labels[0, -1, 0])
 
             # Backprop
             loss.backward()
@@ -101,9 +102,7 @@ class LSTM(nn.Module):
             running_loss += loss.item()
 
         # Average loss per sample
-        # If reduction='sum', running_loss is the sum over all samples
         epoch_loss = running_loss / len(data)
-
         return epoch_loss
 
     def train_model(self, data, device="cpu", epochs=20, lr=1e-3):
@@ -111,14 +110,18 @@ class LSTM(nn.Module):
         Main training loop.
 
         :param device: torch.device (e.g., 'cuda' or 'cpu')
-        :param train_loader: a DataLoader of (images, labels)
+        :param data: list of dictionaries from load_data()
         :param epochs: number of epochs to train
         :param lr: learning rate
         """
+        # Move LSTM to the chosen device
+        self.to(device)
+
         optimizer = optim.Adam(self.parameters(), lr=lr)
         print(f"Original Size: {len(data)}")
-        data = data[0:4000]  # Train first 5000
+        data = data[0:4000]  # Train first 4000
         print(f"New Size: {len(data)}")
+
         for epoch in range(epochs):
             epoch_loss = self.train_one_epoch(data, optimizer, device)
             print(f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss:.4f}")
@@ -139,12 +142,15 @@ def load_data(
     csv_path="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/Safety_Detection_Labeled.csv",
     images_folder="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/",
     vae_weights="vae_weights.pth",
+    device="cpu",
 ):
     df = pd.read_csv(csv_path)
 
     model = VAE(latent_size=32)
-    checkpoint = torch.load(vae_weights, weights_only=False)
+    # Load VAE weights onto the specified device
+    checkpoint = torch.load(vae_weights, map_location=device)
     model.load_state_dict(checkpoint)
+    model.to(device)
     model.eval()
 
     data = []
@@ -164,17 +170,22 @@ def load_data(
         # Load and process the image
         x = load_image(img_path)  # shape [C, H, W]
         # Reshape to add batch dimension => shape [1, C, H, W]
-        x = x.unsqueeze(0)
+        x = x.unsqueeze(0).to(device)
 
         # Encode with the VAE
         with torch.no_grad():
             output, logvar = model.encode(x)
+
+        # Optionally move the output back to CPU if you prefer
+        # embedding = output.cpu()
+        # For now, we can store it on CPU to avoid large GPU memory usage
+        embedding = output.cpu()
+
         data.append({
             "filename": filename,
-            "embedding": output,  # or output_np
+            "embedding": embedding,  # shape [1, latent_size]
             "label": label,
         })
-        # print(data)
     return data
 
 
@@ -184,29 +195,49 @@ def eval(
     vae_weights="vae_weights.pth",
     lstm_weights="lstm_weights.pth",
     seq_len=32,
+    device="cpu",
 ):
+    # Load data on the desired device (the embeddings themselves can go to CPU or GPU)
     data = load_data(
-        csv_path=csv_path, images_folder=images_folder, vae_weights=vae_weights
+        csv_path=csv_path,
+        images_folder=images_folder,
+        vae_weights=vae_weights,
+        device=device,
     )
 
-    data = data[4000:-1]  # Eval last 5000
+    # Evaluate on the last samples (skipping the first 4000)
+    data = data[4000:-1]
+
     model = LSTM()
-    checkpoint = torch.load(lstm_weights, weights_only=False)
+    # Load LSTM weights onto the device
+    checkpoint = torch.load(lstm_weights, map_location=device)
     model.load_state_dict(checkpoint)
+    model.to(device)
     model.eval()
 
     all_preds = []
     all_labels = []
+
     for i in range(0, len(data), 1):
         if i + seq_len == len(data):
             break
         batch = data[i : i + seq_len]
 
-        embeddings = [item["embedding"] for item in batch]
-        labels = [item["label"] for item in batch]
+        embeddings = [
+            item["embedding"] for item in batch
+        ]  # list of [1, latent_size] Tensors
+        labels = [item["label"] for item in batch]  # list of 0/1
 
-        embeddings = torch.cat(embeddings, dim=0).unsqueeze(0)
-        labels = torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
+        embeddings = torch.cat(embeddings, dim=0).unsqueeze(
+            0
+        )  # shape [1, seq_len, in_features]
+        labels = (
+            torch.tensor(labels, dtype=torch.float32).unsqueeze(1).unsqueeze(0)
+        )  # [1, seq_len, 1]
+
+        # Move tensors to the correct device
+        embeddings = embeddings.to(device)
+        labels = labels.to(device)
 
         # Forward pass
         outputs = model.forward(embeddings)
@@ -218,8 +249,9 @@ def eval(
         all_preds.append(pred_label)
         all_labels.append(true_label)
 
-        crit = nn.BCELoss()
-        loss = crit(last_time_step, labels[0, -1, 0])
+        # Optional: check loss for debugging
+        # crit = nn.BCELoss()
+        # loss = crit(last_time_step, labels[0, -1, 0])
         # print(f"Loss: {loss}, Prediction: {pred_label}, Label: {true_label}")
 
     # Once done collecting over the entire dataset, compute metrics:
@@ -245,8 +277,9 @@ def eval(
         fnr = 0.0
     else:
         fnr = fn / (fn + tp)
-    print(f"Accuracy: {accuracy:.4f}")
-    print(f"F1 Score: {f1:.4f}")
+
+    print(f"Accuracy:            {accuracy:.4f}")
+    print(f"F1 Score:            {f1:.4f}")
     print(f"False Positive Rate: {fpr:.4f}")
     print(f"False Negaitve Rate: {fnr:.4f}")
 
@@ -254,10 +287,12 @@ def eval(
 
 
 if __name__ == "__main__":
+    device_choice = "cuda" if torch.cuda.is_available() else "cpu"
+
     # Training
-    data = load_data()
+    data = load_data(device=device_choice)
     model = LSTM()
-    model.train_model(data=data)
+    model.train_model(data=data, device=device_choice)
 
     # Validation Metrics
-    eval()
+    eval(device=device_choice)
