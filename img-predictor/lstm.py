@@ -165,7 +165,7 @@ def eval(
             device=device,
         )
 
-    data = data[4000:4100]
+    data = data[4000:-1]
     model = LSTM().to(device)
 
     vae = VAE(latent_size=32).to(device)
