@@ -268,7 +268,7 @@ def eval(
     # COMPUTE METRICS
     all_preds_tensor = torch.tensor(all_preds)
     all_labels_tensor = torch.tensor(all_labels)
-
+new_list = [1 if item > 0.5 else item for item in my_list]
     accuracy = accuracy_score(all_labels_tensor, all_preds_tensor)
     f1 = f1_score(all_labels_tensor, all_preds_tensor, zero_division=0)
 

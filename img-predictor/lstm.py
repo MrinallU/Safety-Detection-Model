@@ -8,9 +8,18 @@ from torchvision import transforms
 import torch.nn.functional as F
 import os
 from PIL import Image
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import accuracy_score, mean_squared_error
 from PIL import Image
 from torchvision.transforms import ToPILImage
+
+import sys
+import os
+
+# Get the absolute path of the parent directory
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(parent_dir)
+
+import evaluator.lstm as evaluator
 
 
 class LSTM(nn.Module):
@@ -52,21 +61,19 @@ class LSTM(nn.Module):
 
             batch = data[i : i + seq_len + horizon]
 
-            embeddings = [
-                item["embedding"].to(device) for item in batch[0 : len(batch) - horizon]
+            embeddings_raw = [
+                item["embedding"] for item in batch[0 : len(batch) - horizon]
             ]
             future_embeddings = [
-                batch[j + horizon]["embedding"].to(device)
-                for j in range(len(batch) - horizon)
+                batch[j + horizon]["embedding"] for j in range(len(embeddings_raw))
             ]
 
-            embeddings = torch.cat(embeddings, dim=0).unsqueeze(0).to(device)
+            embeddings = torch.cat(embeddings_raw, dim=0).unsqueeze(0).to(device)
             future_embeddings = (
                 torch.cat(future_embeddings, dim=0).unsqueeze(0).to(device)
             )
 
             outputs = self.forward(embeddings)
-
             optimizer.zero_grad()
             loss = criterion(outputs, future_embeddings)
 
@@ -83,7 +90,7 @@ class LSTM(nn.Module):
     ):
         self.to(device)
         optimizer = optim.Adam(self.parameters(), lr=lr)
-        data = data[0:4000]
+        data = data[1000:4000]
         finLoss = None
 
         for epoch in range(epochs):
@@ -166,6 +173,14 @@ def eval(
         )
 
     data = data[4000:-1]
+
+    eval_model = evaluator.LSTM().to(device)
+    checkpoint = torch.load(
+        "../evaluator/lstm_weights.pth", map_location=device, weights_only=True
+    )
+    eval_model.load_state_dict(checkpoint)
+    eval_model.eval()
+
     model = LSTM().to(device)
 
     vae = VAE(latent_size=32).to(device)
@@ -181,45 +196,56 @@ def eval(
 
     all_preds = []
     all_outs = []
-    index1 = 0
-    index2 = 0
+    all_safety_preds = []
+    all_safety_actuals = []
+    index = 0
 
     for i in range(0, len(data), 1):
         if i + seq_len + horizon >= len(data):
             break
 
         batch = data[i : i + seq_len + horizon]
-        embeddings = [item["embedding"] for item in batch[0 : len(batch) - horizon]]
-        embeddings = torch.cat(embeddings, dim=0).unsqueeze(0).to(device)
+        embeddings_raw = [item["embedding"] for item in batch[0 : len(batch) - horizon]]
+        embeddings = torch.cat(embeddings_raw, dim=0).unsqueeze(0).to(device)
 
         future_embeddings = [
-            batch[j + horizon]["embedding"] for j in range(len(batch) - horizon)
+            batch[j + horizon]["embedding"] for j in range(len(embeddings_raw))
         ]
+        future_labels = [
+            batch[j + horizon]["label"] for j in range(len(embeddings_raw))
+        ]
+        # future_images = [
+        #     batch[j + horizon]["image"] for j in range(len(embeddings_raw))
+        # ]
+
         future_embeddings = torch.cat(future_embeddings, dim=0).unsqueeze(0).to(device)
 
         outputs = model.forward(embeddings)
+        safety_preds = eval_model.forward(outputs)
+        safety_preds = safety_preds[0].squeeze().tolist()
+
+        all_safety_actuals.extend(future_labels)
+        all_safety_preds.extend(safety_preds)
 
         # SAVE IMAGES
         # decoded_outputs = vae.decode(outputs)
-        # decoded_tensor = vae.decode(future_embeddings)  # shape [3, 224, 224]
 
-        # for tensor in decoded_tensor:
-        #     img = to_pil(tensor)
-        #     img_filename = f"decoded_image_{index1}.png"
-        #     img_path = os.path.join("actual_images", img_filename)
-        #     img.save(img_path)
-        #     index1 += 1
+        # tensor = future_images[-1].squeeze(0).to(device)
+        # img = to_pil(tensor)
+        # img_filename = f"image_{index}.png"
+        # img_path = os.path.join("actual_images", img_filename)
+        # img.save(img_path)
 
-        # for tensor in decoded_outputs:
-        #     img = to_pil(tensor)
-        #     img_filename = f"decoded_image_{index2}.png"
-        #     img_path = os.path.join("pred_images", img_filename)
-        #     img.save(img_path)
-        #     index2 += 1
+        # tensor = decoded_outputs[-1]
+        # img = to_pil(tensor)
+        # img_filename = f"decoded_image_{index}.png"
+        # img_path = os.path.join("pred_images", img_filename)
+        # img.save(img_path)
+
+        index += 1
 
         future_embeddings = future_embeddings[0]
         outputs = outputs[0]
-        # print(f"{outputs.shape} {future_embeddings.shape}")
 
         all_preds.append(outputs)
         all_outs.append(future_embeddings)
@@ -229,16 +255,19 @@ def eval(
 
     mse_val = criterion(val_tensor, model_tensor)
 
+    all_safety_preds = [1 if item > 0.5 else 0 for item in all_safety_preds]
+    accuracy = accuracy_score(all_safety_preds, all_safety_actuals)
+    print(f"Accuracy: {accuracy}")
     print(f"MSE: {mse_val:.4f}")
-    return mse_val
+    return mse_val, accuracy
 
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     lens = [32]
     horizon_init = 10
-    horizon_increment = 5
-    horizon_limit = 100
+    horizon_increment = 10
+    horizon_limit = 90
     # Training
     data = load_data(device=device)
     print("DATA loaded")
@@ -247,8 +276,8 @@ if __name__ == "__main__":
         for l in lens:
             print(f"Results for Horizon {h} and Sequence Length {l}:")
             print("_______________________________________________")
-            model.train_model(data=data, seq_len=l, horizon=h, device=device, epochs=10)
-            mse = eval(
+            model.train_model(data=data, seq_len=l, horizon=h, device=device, epochs=30)
+            mse, acc = eval(
                 load_lstm_weights=True,
                 load_d=False,
                 data=data,
@@ -260,4 +289,4 @@ if __name__ == "__main__":
                 file.write(f"Results for Horizon {h} and Sequence Length {l}:\n")
                 file.write("_______________________________________________\n")
                 file.write(f"MSE: {mse: .4f}\n")
-                # file.write(f"ssim: {ssim: .4f}\n")
+                file.write(f"Accuracy: {acc: .4f}\n")

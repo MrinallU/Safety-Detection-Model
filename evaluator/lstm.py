@@ -66,6 +66,7 @@ class LSTM(nn.Module):
         # random.shuffle(data)
 
         # Process the data
+        data = data[0:4000]
         for i in range(0, len(data), 1):
             if i + seq_len == len(data):
                 break

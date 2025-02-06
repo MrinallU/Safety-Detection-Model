@@ -1,1 +1,24 @@
-
+Results for Horizon 10 and Sequence Length 32:
+_______________________________________________
+MSE:  0.4650
+Results for Horizon 20 and Sequence Length 32:
+_______________________________________________
+MSE:  0.6538
+Results for Horizon 30 and Sequence Length 32:
+_______________________________________________
+MSE:  0.7446
+Results for Horizon 40 and Sequence Length 32:
+_______________________________________________
+MSE:  0.8056
+Results for Horizon 50 and Sequence Length 32:
+_______________________________________________
+MSE:  0.8616
+Results for Horizon 60 and Sequence Length 32:
+_______________________________________________
+MSE:  0.9330
+Results for Horizon 70 and Sequence Length 32:
+_______________________________________________
+MSE:  0.9569
+Results for Horizon 80 and Sequence Length 32:
+_______________________________________________
+MSE:  0.9927
