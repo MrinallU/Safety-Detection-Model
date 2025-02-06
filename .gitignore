@@ -1,6 +1,6 @@
 safety_detection_labeled_data/
 safety_detection_labeled_data.zip
 *.pth
-img-predictor/saved_images/
-img-predictor/actual_images/
-img-predictor/pred_images/
+seq-predictor/saved_images/
+seq-predictor/actual_images/
+seq-predictor/pred_images/
