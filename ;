@@ -1,4 +1,5 @@
 import torch
+import time
 import pandas as pd
 import torch.optim as optim
 from vae import VAE
@@ -162,6 +163,7 @@ def eval_train_cc(
     data=None,
     device="cpu",
 ):
+    criterion = nn.MSELoss()
     if load_d:
         data = load_data(
             csv_path=csv_path,
@@ -243,8 +245,8 @@ def eval_train_cc(
         safety_preds = eval_model.forward(outputs)
         safety_preds = safety_preds[0].squeeze().tolist()
 
-        all_safety_actuals_val.extend(future_labels)
-        all_safety_preds_val.extend(safety_preds)
+        all_safety_actuals.extend(future_labels)
+        all_safety_preds.extend(safety_preds)
 
     return (
         all_safety_preds,

@@ -142,6 +142,7 @@ def load_images_from_folder(folder):
 def train():
     folder_path = "/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data"
     image_array = load_images_from_folder(folder_path)
+    image_array = image_array[0:4000]
     model = VAE(latent_size=32)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
@@ -159,12 +160,12 @@ def train():
 
         avg_loss = epoch_loss / len(image_array)
         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
-    torch.save(model.state_dict(), "vae_weights.pth")
+    torch.save(model.state_dict(), "vae_weights_split.pth")
 
 
 def eval(x):
     model = VAE(latent_size=32)
-    checkpoint = torch.load("vae_weights.pth", weights_only=False)
+    checkpoint = torch.load("vae_weights_split.pth", weights_only=False)
     model.load_state_dict(checkpoint)
     model.eval()
 
@@ -178,6 +179,7 @@ def eval(x):
 
 if __name__ == "__main__":
     folder_path = "/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data"
+    # train()
     image_array = load_images_from_folder(folder_path)
     x = image_array[0]
     x = x / 255.0
