@@ -10,7 +10,7 @@ from PIL import Image
 from sklearn.metrics import accuracy_score, mean_squared_error
 from PIL import Image
 from torchvision.transforms import ToPILImage
-
+import numpy as np
 import sys
 import os
 
@@ -247,10 +247,10 @@ def eval_train_cc(
         all_safety_preds_val.extend(safety_preds)
 
     return (
-        all_safety_preds,
-        all_safety_actuals,
-        all_safety_preds_val,
-        all_safety_actuals_val,
+        np.array(all_safety_preds),
+        np.array(all_safety_actuals),
+        np.array(all_safety_preds_val),
+        np.array(all_safety_actuals_val),
     )
 
 

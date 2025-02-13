@@ -11,8 +11,8 @@ import lstm
 
 def main(step, testpath, validpath):
     data = {}
-    data["sft"] = {}
-    data["lbl"] = {}
+    data["sft"] = []
+    data["lbl"] = []
     data_vali = {}
     data_vali["sft"] = {}
     data_vali["lbl"] = {}
@@ -35,10 +35,6 @@ def main(step, testpath, validpath):
         device="cpu",
     )
 
-    print(data["sft"][step].shape)
-    print(data["lbl"][step].shape)
-    print(data_vali["sft"][step].shape)
-    print(data_vali["lbl"][step].shape)
     n_bins = 10
     bins = 10
     hist_bins = 20
