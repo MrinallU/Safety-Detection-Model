@@ -388,7 +388,7 @@ if __name__ == "__main__":
                 seq_len=l,
                 device=device,
             )
-            with open("results.txt", "a") as file:
+            with open("./reliability_results/accuracy.txt", "a") as file:
                 file.write(f"Results for Horizon {h} and Sequence Length {l}:\n")
                 file.write("_______________________________________________\n")
                 file.write(f"MSE: {mse: .4f}\n")

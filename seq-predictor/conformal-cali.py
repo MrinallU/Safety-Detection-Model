@@ -56,23 +56,23 @@ def main(step, testpath, validpath):
     temperature = TemperatureScaling()
 
     histogram = HistogramBinning(hist_bins)
-    iso = IsotonicRegression()
+    # iso = IsotonicRegression()
     bbq = BBQ()
     enir = ENIR()
     method = "mle"
 
     lr_calibration = LogisticCalibration(detection=False, method=method)
     temperature = TemperatureScaling(detection=False, method=method)
-    betacal = BetaCalibration(detection=False, method=method)
+    # betacal = BetaCalibration(detection=False, method=method)
 
     models = [
         ("hist", histogram),
-        ("iso", iso),
-        ("bbq", bbq),
-        ("enir", enir),
-        ("lr", lr_calibration),
+        # ("iso", iso),
+        # ("bbq", bbq),
+        # ("enir", enir),
+        # ("lr", lr_calibration),
         ("temperature", temperature),
-        ("beta", betacal),
+        # ("beta", betacal),
     ]
 
     ace = ACE(bins)
@@ -81,9 +81,9 @@ def main(step, testpath, validpath):
     validation_set_sm = confidences
     validation_set_gt = ground_truth
     predictions = []
-    all_ace = [ace.measure(validation_set_sm, validation_set_gt)]
-    all_ece = [ece.measure(validation_set_sm, validation_set_gt)]
-    all_mce = [mce.measure(validation_set_sm, validation_set_gt)]
+    all_ace = []
+    all_ece = []
+    all_mce = []
     for model in models:
         name, instance = model
         print("Build %s model" % name)
@@ -97,39 +97,37 @@ def main(step, testpath, validpath):
         all_ace.append(ace.measure(prediction, validation_set_gt))
         all_ece.append(ece.measure(prediction, validation_set_gt))
         all_mce.append(mce.measure(prediction, validation_set_gt))
-    x = [0, 1, 2, 3, 4, 5, 6, 7]
+    x = [0, 1]
     # plt.plot(x, all_ece, x, all_mce)
-    plt.plot(
-        x,
-        all_ece,
-    )
-    plt.show()
+    # plt.plot(
+    #     x,
+    #     all_ece,
+    # )
+    # plt.show()
     print(all_ece)
     print(all_mce)
     bins2 = np.linspace(0.1, 1, bins)
 
-    diagram = ReliabilityDiagram(bins=bins, title_suffix="default")
-    diagram.plot(
-        validation_set_sm,
-        validation_set_gt,
-        filename="./" + str(step) + "test" + str(all_ece[0]) + ".png",
-    )
+    # diagram = ReliabilityDiagram(bins=bins, title_suffix="default")
+    # diagram.plot(
+    #     validation_set_sm,
+    #     validation_set_gt,
+    #     filename="./" + str(step) + "test" + str(all_ece[0]) + ".png",
+    # )
 
     method_num = np.argmin(all_ece)
-    print(method_num)
+    print(f"ECE: {all_ece[method_num]}")
 
-    diagram = ReliabilityDiagram(bins=bins, title_suffix=models[method_num][0])
+    with open("./reliability_results/ece_scores.txt", "a") as file:
+        file.write(f"ECE: {all_ece[method_num]}\n")
+
+    diagram = ReliabilityDiagram(bins=bins, title_suffix=models[method_num])
     prediction = predictions[method_num]
     diagram.plot(
         prediction,
         validation_set_gt,
-        filename="./"
-        + str(step)
-        + "step"
-        + str(method_num)
-        + "-"
-        + str(all_ece[method_num])
-        + ".png",
+        filename="./reliability_results/" + str(step) + ".png",
+        title_suffix="",
     )
 
     binned = np.digitize(prediction, bins2)
@@ -159,17 +157,17 @@ def main(step, testpath, validpath):
             dset.append(0)
 
             # ki = (1-0.9)*(1+ni/2)
-    print(binsamount)
-    np.savez_compressed(
-        str(step) + "k95200.npz",
-        dset=dset,
-        lbl=validation_set_gt,
-        cali=prediction,
-        ori=validation_set_sm,
-        ece=all_ece,
-        mce=all_mce,
-        number=method_num,
-    )
+    # print(binsamount)
+    # np.savez_compressed(
+    #     str(step) + "k95200.npz",
+    #     dset=dset,
+    #     lbl=validation_set_gt,
+    #     cali=prediction,
+    #     ori=validation_set_sm,
+    #     ece=all_ece,
+    #     mce=all_mce,
+    #     number=method_num,
+    # )
     print("end")
     return all_ece[0], all_ece[method_num], all_ace[0], all_ace[method_num]
 
