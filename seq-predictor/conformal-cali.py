@@ -56,23 +56,23 @@ def main(step, testpath, validpath):
     temperature = TemperatureScaling()
 
     histogram = HistogramBinning(hist_bins)
-    # iso = IsotonicRegression()
+    iso = IsotonicRegression()
     bbq = BBQ()
     enir = ENIR()
     method = "mle"
 
     lr_calibration = LogisticCalibration(detection=False, method=method)
     temperature = TemperatureScaling(detection=False, method=method)
-    # betacal = BetaCalibration(detection=False, method=method)
+    betacal = BetaCalibration(detection=False, method=method)
 
     models = [
         ("hist", histogram),
-        # ("iso", iso),
-        # ("bbq", bbq),
+        ("iso", iso),
+        ("bbq", bbq),
         # ("enir", enir),
-        # ("lr", lr_calibration),
+        ("lr", lr_calibration),
         ("temperature", temperature),
-        # ("beta", betacal),
+        ("beta", betacal),
     ]
 
     ace = ACE(bins)
