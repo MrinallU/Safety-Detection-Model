@@ -74,6 +74,7 @@ class LSTM(nn.Module):
 
             outputs = self.forward(embeddings)
             optimizer.zero_grad()
+
             loss = criterion(outputs, future_embeddings)
 
             loss.backward()
@@ -246,6 +247,13 @@ def eval_train_cc(
         all_safety_actuals_val.extend(future_labels)
         all_safety_preds_val.extend(safety_preds)
 
+    # all_safety_preds = [
+    #     item if item < 0.9 else np.float64(1) for item in all_safety_preds
+    # ]
+    # all_safety_preds_val = [
+    #     item if item < 0.9 else np.float64(1) for item in all_safety_preds_val
+    # ]
+
     return (
         np.array(all_safety_preds),
         np.array(all_safety_actuals),
@@ -379,7 +387,9 @@ if __name__ == "__main__":
         for l in lens:
             print(f"Results for Horizon {h} and Sequence Length {l}:")
             print("_______________________________________________")
-            model.train_model(data=data, seq_len=l, horizon=h, device=device, epochs=30)
+            model.train_model(
+                data=data, seq_len=l, horizon=h, device=device, epochs=100
+            )
             mse, acc = eval(
                 load_lstm_weights=True,
                 load_d=False,

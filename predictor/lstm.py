@@ -6,6 +6,7 @@ import torch.nn as nn
 from torchvision import transforms
 import torch.nn.functional as F
 import os
+import numpy as np
 from PIL import Image
 from sklearn.metrics import (
     accuracy_score,
@@ -23,7 +24,7 @@ class LSTM(nn.Module):
         num_classes=1,
         in_features=32,
         lstm_units=256,
-        num_lstm_layers=1,
+        num_lstm_layers=2,
         bidirectional=False,
     ):
         super(LSTM, self).__init__()
@@ -135,6 +136,7 @@ class LSTM(nn.Module):
             if finLoss > epoch_loss:
                 finLoss = epoch_loss
                 torch.save(self.state_dict(), "lstm_weights_pred.pth")
+                torch.save(self.state_dict(), f"lstm_weights{horizon}.pth")
             # print(f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss:.4f}")
 
         print(f"Loss: {finLoss:.4f}")
@@ -191,6 +193,113 @@ def load_data(
             "label": label,
         })
     return data
+
+
+def eval_train_cc(
+    csv_path="../safety_detection_labeled_data/Safety_Detection_Labeled.csv",
+    images_folder="../safety_detection_labeled_data/",
+    vae_weights="vae_weights.pth",
+    lstm_weights="lstm_weights_pred.pth",
+    seq_len=32,
+    horizon=10,
+    load_lstm_weights=True,
+    load_d=True,
+    data=None,
+    device="cpu",
+):
+    if load_d:
+        data = load_data(
+            csv_path=csv_path,
+            images_folder=images_folder,
+            vae_weights=vae_weights,
+            device=device,
+        )
+    data_val = data[4000:-1]
+    data = data[0:4000]
+
+    model = LSTM().to(device)
+
+    vae = VAE(latent_size=32).to(device)
+    checkpoint = torch.load(vae_weights, map_location=device, weights_only=True)
+    vae.load_state_dict(checkpoint)
+    vae.eval()
+
+    if load_lstm_weights:
+        checkpoint = torch.load(lstm_weights, map_location=device, weights_only=True)
+        model.load_state_dict(checkpoint)
+    model.eval()
+
+    all_safety_preds = []
+    all_safety_actuals = []
+    all_safety_actuals_val = []
+    all_safety_preds_val = []
+
+    for i in range(0, len(data), 1):
+        if i + seq_len + horizon >= len(data):
+            break
+
+        batch = data[i : i + seq_len + horizon]
+        embeddings_raw = [item["embedding"] for item in batch[0 : len(batch) - horizon]]
+        embeddings = torch.cat(embeddings_raw, dim=0).unsqueeze(0).to(device)
+
+        # Gather the label we want to predict (the label "horizon" steps ahead)
+        labels = []
+        for j in range(len(batch) - horizon):
+            labels.append(batch[j + horizon]["label"])
+        labels = (
+            torch.tensor(labels, dtype=torch.float32)
+            .unsqueeze(1)
+            .unsqueeze(0)
+            .to(device)
+        )
+
+        # Forward pass through LSTM
+        outputs = model.forward(embeddings)  # Shape: [1, seq_len, 1]
+
+        # Get the predicted probability from the last time step
+        last_time_step = outputs[-1, -1, 0]
+        true_label = labels[0, -1, 0].item()
+
+        all_safety_actuals.append(true_label)
+        all_safety_preds.append(last_time_step.float().detach())
+
+    data = data_val
+
+    for i in range(0, len(data), 1):
+        if i + seq_len + horizon >= len(data):
+            break
+
+        batch = data[i : i + seq_len + horizon]
+        embeddings_raw = [item["embedding"] for item in batch[0 : len(batch) - horizon]]
+        embeddings = torch.cat(embeddings_raw, dim=0).unsqueeze(0).to(device)
+
+        # Gather the label we want to predict (the label "horizon" steps ahead)
+        labels = []
+        for j in range(len(batch) - horizon):
+            labels.append(batch[j + horizon]["label"])
+        labels = (
+            torch.tensor(labels, dtype=torch.float32)
+            .unsqueeze(1)
+            .unsqueeze(0)
+            .to(device)
+        )
+
+        # Forward pass through LSTM
+        outputs = model.forward(embeddings)  # Shape: [1, seq_len, 1]
+
+        # Get the predicted probability from the last time step
+        last_time_step = outputs[-1, -1, 0]
+        true_label = labels[0, -1, 0].item()
+
+        all_safety_actuals_val.append(true_label)
+        all_safety_preds_val.append(last_time_step.float().detach())
+
+    return (
+        np.array(all_safety_preds),
+        np.array(all_safety_actuals),
+        np.array(all_safety_preds_val),
+        np.array(all_safety_actuals_val),
+    )
 
 
 def eval(
@@ -268,7 +377,7 @@ def eval(
     # COMPUTE METRICS
     all_preds_tensor = torch.tensor(all_preds)
     all_labels_tensor = torch.tensor(all_labels)
-new_list = [1 if item > 0.5 else item for item in my_list]
+    # new_list = [1 if item > 0.5 else item for item in my_list]
     accuracy = accuracy_score(all_labels_tensor, all_preds_tensor)
     f1 = f1_score(all_labels_tensor, all_preds_tensor, zero_division=0)
 
@@ -306,9 +415,9 @@ if __name__ == "__main__":
     # Grid Search
     # Hyperparameters
     lens = [32]
-    horizon_init = 0
-    horizon_increment = 20
-    horizon_limit = 100
+    horizon_init = 10
+    horizon_increment = 10
+    horizon_limit = 91
 
     # Training
     data = load_data(device=device_choice)
@@ -318,7 +427,9 @@ if __name__ == "__main__":
         for l in lens:
             print(f"Results for Horizon {h} and Sequence Length {l}:")
             print("_______________________________________________")
-            model.train_model(data=data, device=device_choice, seq_len=l, horizon=h)
+            model.train_model(
+                data=data, device=device_choice, seq_len=l, horizon=h, epochs=100
+            )
             acc, f1, fpr, fnr, p, r, mse = eval(
                 load_lstm_weights=True,
                 load_d=False,
