@@ -147,7 +147,9 @@ def load_data(
             "label": label,
             "image": x.to(device),
         })
-
+    data = sorted(
+        data, key=lambda item: int(item["filename"].split("_")[1].split(".")[0])
+    )
     return data
 
 
@@ -397,7 +399,9 @@ if __name__ == "__main__":
                 horizon=h,
                 seq_len=l,
                 device=device,
+                lstm_weights=f"lstm_weights{h}.pth",
             )
+
             with open("./reliability_results/accuracy.txt", "a") as file:
                 file.write(f"Results for Horizon {h} and Sequence Length {l}:\n")
                 file.write("_______________________________________________\n")
