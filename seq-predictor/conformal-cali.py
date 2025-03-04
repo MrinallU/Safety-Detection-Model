@@ -81,6 +81,25 @@ def main(step, testpath, validpath):
     validation_set_sm = confidences
     validation_set_gt = ground_truth
     predictions = []
+
+    ece_precal = [ece.measure(validation_set_sm, validation_set_gt)]
+    method_num = np.argmin(ece_precal)
+    print(f"ECE: {ece_precal[method_num]}")
+
+    with open("./reliability_results/ece_scores.txt", "a") as file:
+        file.write(f"Precalibrated ECE: {ece_precal[method_num]}\n")
+
+    diagram = ReliabilityDiagram(bins=bins, title_suffix="default")
+    diagram.plot(
+        validation_set_sm,
+        validation_set_gt,
+        filename="./reliability_results/"
+        + str(step)
+        + "precal"
+        + str(ece_precal[method_num])
+        + ".png",
+    )
+
     all_ace = []
     all_ece = []
     all_mce = []
@@ -120,7 +139,7 @@ def main(step, testpath, validpath):
 
     with open("./reliability_results/ece_scores.txt", "a") as file:
         file.write(f"ECE: {all_ece[method_num]}\n")
-
+        file.write("\n")
     diagram = ReliabilityDiagram(bins=bins, title_suffix=models[method_num])
     prediction = predictions[method_num]
     diagram.plot(
