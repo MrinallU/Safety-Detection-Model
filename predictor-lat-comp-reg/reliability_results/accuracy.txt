@@ -1,0 +1,41 @@
+FINAL 
+Results for Horizon 10 and Sequence Length 32:
+_______________________________________________
+MSE:  0.4172
+Accuracy:  0.8578
+Results for Horizon 20 and Sequence Length 32:
+_______________________________________________
+MSE:  0.6087
+Accuracy:  0.8136
+Results for Horizon 30 and Sequence Length 32:
+_______________________________________________
+MSE:  0.7238
+Accuracy:  0.8246
+Results for Horizon 40 and Sequence Length 32:
+_______________________________________________
+MSE:  0.8075
+Accuracy:  0.8119
+Results for Horizon 50 and Sequence Length 32:
+_______________________________________________
+MSE:  0.9100
+Accuracy:  0.8244
+Results for Horizon 60 and Sequence Length 32:
+_______________________________________________
+MSE:  1.0768
+Accuracy:  0.7926
+Results for Horizon 70 and Sequence Length 32:
+_______________________________________________
+MSE:  1.1268
+Accuracy:  0.7360
+Results for Horizon 80 and Sequence Length 32:
+_______________________________________________
+MSE:  1.2004
+Accuracy:  0.7338
+Results for Horizon 90 and Sequence Length 32:
+_______________________________________________
+MSE:  1.3128
+Accuracy:  0.7213
+Results for Horizon 100 and Sequence Length 32:
+_______________________________________________
+MSE:  1.5419
+Accuracy:  0.6824

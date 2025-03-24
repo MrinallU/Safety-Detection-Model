@@ -106,7 +106,7 @@ class LSTM(nn.Module):
         epoch_loss = running_loss / len(data)
         return epoch_loss
 
-    def train_model(self, data, device="cpu", epochs=20, lr=1e-3):
+    def train_model(self, data, device="cpu", epochs=100, lr=1e-3):
         """
         Main training loop.
 
@@ -122,12 +122,15 @@ class LSTM(nn.Module):
         print(f"Original Size: {len(data)}")
         data = data[0:4000]  # Train first 4000
         print(f"New Size: {len(data)}")
-
+        globLoss = 10000
         for epoch in range(epochs):
             epoch_loss = self.train_one_epoch(data, optimizer, device)
+            if globLoss > epoch_loss:
+                torch.save(self.state_dict(), "lstm_weights.pth")
+                globLoss = epoch_loss
             print(f"Epoch [{epoch + 1}/{epochs}], Loss: {epoch_loss:.4f}")
 
-        torch.save(self.state_dict(), "lstm_weights.pth")
+        print(f"Best Loss: {globLoss:.4f}")
 
 
 def load_image(filepath):
@@ -142,7 +145,7 @@ def load_image(filepath):
 def load_data(
     csv_path="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/Safety_Detection_Labeled.csv",
     images_folder="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/",
-    vae_weights="vae_weights.pth",
+    vae_weights="vae_weights_split.pth",
     device="cpu",
 ):
     df = pd.read_csv(csv_path)
@@ -187,13 +190,16 @@ def load_data(
             "embedding": embedding,  # shape [1, latent_size]
             "label": label,
         })
+    data = sorted(
+        data, key=lambda item: int(item["filename"].split("_")[1].split(".")[0])
+    )
     return data
 
 
 def eval(
     csv_path="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/Safety_Detection_Labeled.csv",
     images_folder="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/",
-    vae_weights="vae_weights.pth",
+    vae_weights="vae_weights_split.pth",
     lstm_weights="lstm_weights.pth",
     seq_len=32,
     device="cpu",

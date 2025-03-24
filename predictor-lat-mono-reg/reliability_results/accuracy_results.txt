@@ -1,0 +1,83 @@
+FINAL
+Results for Horizon 10 and Sequence Length 32:
+_______________________________________________
+Accuracy: 0.8944 
+F1 Score: 0.9103 
+Precision:  0.8919
+Recall:  0.9296
+MSE:  0.1056
+False Positive Rate: 0.1537
+False Negative Rate: 0.0704
+Results for Horizon 20 and Sequence Length 32:
+_______________________________________________
+Accuracy: 0.8395 
+F1 Score: 0.8662 
+Precision:  0.8335
+Recall:  0.9017
+MSE:  0.1605
+False Positive Rate: 0.2452
+False Negative Rate: 0.0983
+Results for Horizon 30 and Sequence Length 32:
+_______________________________________________
+Accuracy: 0.8191 
+F1 Score: 0.8469 
+Precision:  0.8256
+Recall:  0.8694
+MSE:  0.1809
+False Positive Rate: 0.2489
+False Negative Rate: 0.1306
+Results for Horizon 40 and Sequence Length 32:
+_______________________________________________
+Accuracy: 0.7822 
+F1 Score: 0.8234 
+Precision:  0.7741
+Recall:  0.8796
+MSE:  0.2178
+False Positive Rate: 0.3510
+False Negative Rate: 0.1204
+Results for Horizon 50 and Sequence Length 32:
+_______________________________________________
+Accuracy: 0.7706 
+F1 Score: 0.8103 
+Precision:  0.7781
+Recall:  0.8454
+MSE:  0.2294
+False Positive Rate: 0.3326
+False Negative Rate: 0.1546
+Results for Horizon 60 and Sequence Length 32:
+_______________________________________________
+Accuracy: 0.7570 
+F1 Score: 0.7992 
+Precision:  0.7654
+Recall:  0.8363
+MSE:  0.2430
+False Positive Rate: 0.3516
+False Negative Rate: 0.1637
+Results for Horizon 70 and Sequence Length 32:
+_______________________________________________
+Accuracy: 0.7146 
+F1 Score: 0.7628 
+Precision:  0.7321
+Recall:  0.7963
+MSE:  0.2854
+False Positive Rate: 0.3965
+False Negative Rate: 0.2037
+Results for Horizon 80 and Sequence Length 32:
+_______________________________________________
+Accuracy: 0.6867 
+F1 Score: 0.7284 
+Precision:  0.7254
+Recall:  0.7313
+MSE:  0.3133
+False Positive Rate: 0.3735
+False Negative Rate: 0.2687
+Results for Horizon 90 and Sequence Length 32:
+_______________________________________________
+Accuracy: 0.6585 
+F1 Score: 0.6989 
+Precision:  0.7056
+Recall:  0.6923
+MSE:  0.3415
+False Positive Rate: 0.3866
+False Negative Rate: 0.3077
+
