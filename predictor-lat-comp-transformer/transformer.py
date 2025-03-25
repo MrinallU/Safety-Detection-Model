@@ -1,4 +1,5 @@
 import torch
+import time
 import pandas as pd
 import torch.optim as optim
 from vae import VAE
@@ -311,6 +312,8 @@ def eval(
     all_safety_preds = []
     all_safety_actuals = []
     index = 0
+    exec_time_tot = 0
+    iters = 0
 
     for i in range(0, len(data), 1):
         if i + seq_len + horizon >= len(data):
@@ -331,13 +334,16 @@ def eval(
         # ]
 
         future_embeddings = torch.cat(future_embeddings, dim=0).unsqueeze(0).to(device)
-
+        st = time.time()
         outputs = model.forward(embeddings)
         safety_preds = eval_model.forward(outputs)
         safety_preds = safety_preds[0].squeeze().tolist()
+        ed = time.time()
 
         all_safety_actuals.append(future_labels[-1])
         all_safety_preds.append(safety_preds[-1])
+        exec_time_tot += ed - st
+        iters += 1
 
         # SAVE IMAGES
         # decoded_outputs = vae.decode(outputs)
@@ -371,6 +377,7 @@ def eval(
     accuracy = accuracy_score(all_safety_preds, all_safety_actuals)
     print(f"Accuracy: {accuracy}")
     print(f"MSE: {mse_val:.4f}")
+    print(f"Average Execution time: {(exec_time_tot / iters)}")
     return mse_val, accuracy
 
 
@@ -389,9 +396,9 @@ if __name__ == "__main__":
         for l in lens:
             print(f"Results for Horizon {h} and Sequence Length {l}:")
             print("_______________________________________________")
-            model.train_model(
-                data=data, seq_len=l, horizon=h, device=device, epochs=epochs
-            )
+            # model.train_model(
+            #     data=data, seq_len=l, horizon=h, device=device, epochs=epochs
+            # )
             mse, acc = eval(
                 load_transformer_weights=True,
                 load_d=False,
