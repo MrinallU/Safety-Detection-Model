@@ -1,2 +1,0 @@
-1. Retrain VAE(s) with a train/test split 
-2. Test multiple horizons img-predicor.

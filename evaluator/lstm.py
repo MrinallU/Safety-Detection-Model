@@ -106,7 +106,7 @@ class LSTM(nn.Module):
         epoch_loss = running_loss / len(data)
         return epoch_loss
 
-    def train_model(self, data, device="cpu", epochs=100, lr=1e-3):
+    def train_model(self, data, device="cpu", epochs=50, lr=1e-3):
         """
         Main training loop.
 
@@ -143,9 +143,9 @@ def load_image(filepath):
 
 
 def load_data(
-    csv_path="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/Safety_Detection_Labeled.csv",
-    images_folder="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/",
-    vae_weights="vae_weights_split.pth",
+    csv_path="./safety_detection_labeled_data/Safety_Detection_Labeled.csv",
+    images_folder="./safety_detection_labeled_data/",
+    vae_weights="./vae_weights.pth",
     device="cpu",
 ):
     df = pd.read_csv(csv_path)
@@ -197,10 +197,10 @@ def load_data(
 
 
 def eval(
-    csv_path="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/Safety_Detection_Labeled.csv",
-    images_folder="/home/mrinall/TEA/hsai-predictor/MonoLstm/version2/safety_detection_labeled_data/",
-    vae_weights="vae_weights_split.pth",
-    lstm_weights="lstm_weights.pth",
+    csv_path="../safety_detection_labeled_data/Safety_Detection_Labeled.csv",
+    images_folder="../safety_detection_labeled_data/",
+    vae_weights="./vae_weights.pth",
+    lstm_weights="./lstm_weights.pth",
     seq_len=32,
     device="cpu",
 ):
@@ -297,9 +297,9 @@ if __name__ == "__main__":
     device_choice = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Training
-    data = load_data(device=device_choice)
-    model = LSTM()
-    model.train_model(data=data, device=device_choice)
+    # data = load_data(device=device_choice)
+    # model = LSTM()
+    # model.train_model(data=data, device=device_choice)
 
     # Validation Metrics
     eval(device=device_choice)
