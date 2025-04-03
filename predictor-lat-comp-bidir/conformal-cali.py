@@ -7,6 +7,7 @@ from netcal.metrics import ACE, ECE, MCE
 from netcal.presentation import ReliabilityDiagram
 import matplotlib.pyplot as plt
 import lstm
+import pandas as pd
 
 
 def main(step, testpath, validpath):
@@ -39,6 +40,21 @@ def main(step, testpath, validpath):
     print(data["lbl"][step].shape)
     print(data_vali["sft"][step].shape)
     print(data_vali["lbl"][step].shape)
+
+    # Save training data to CSV
+    df_train = pd.DataFrame()
+    df_train["softmax"] = data["sft"][step]
+    df_train["label"] = data["lbl"][step]
+    df_train.to_csv(
+        f"./reliability_results/output_data/train_step{step}.csv", index=False
+    )
+
+    # Save validation data to CSV
+    df_vali = pd.DataFrame()
+    df_vali["softmax"] = data_vali["sft"][step]
+    df_vali["label"] = data_vali["lbl"][step]
+    df_vali.to_csv(f"./reliability_results/output_data/val_step{step}.csv", index=False)
+
     n_bins = 10
     bins = 10
     hist_bins = 20
@@ -214,12 +230,13 @@ if __name__ == "__main__":
     mce2 = []
     for i in range(10, 101, 10):
         print(i)
-        a, b, c, d = main(i, testpath, validpath)
-        ece2.append(b)
-        mce2.append(d)
-        ece.append(a)
-        ece.append(c)
-        print(ece)
-        print(ece2)
-        print(mce)
-        print(mce2)
+        # a, b, c, d =
+        main(i, testpath, validpath)
+        # ece2.append(b)
+        # mce2.append(d)
+        # ece.append(a)
+        # ece.append(c)
+        # print(ece)
+        # print(ece2)
+        # print(mce)
+        # print(mce2)

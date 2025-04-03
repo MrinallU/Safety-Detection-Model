@@ -220,8 +220,8 @@ def eval_train_cc(
         safety_preds = eval_model.forward(outputs)
         safety_preds = safety_preds[0].squeeze().tolist()
 
-        all_safety_actuals.extend(future_labels)
-        all_safety_preds.extend(safety_preds)
+        all_safety_actuals.append(future_labels[-1])
+        all_safety_preds.append(safety_preds[-1])
 
     data = data_val
 
@@ -246,8 +246,8 @@ def eval_train_cc(
         safety_preds = eval_model.forward(outputs)
         safety_preds = safety_preds[0].squeeze().tolist()
 
-        all_safety_actuals_val.extend(future_labels)
-        all_safety_preds_val.extend(safety_preds)
+        all_safety_actuals_val.append(future_labels[-1])
+        all_safety_preds_val.append(safety_preds[-1])
 
     # all_safety_preds = [
     #     item if item < 0.9 else np.float64(1) for item in all_safety_preds
