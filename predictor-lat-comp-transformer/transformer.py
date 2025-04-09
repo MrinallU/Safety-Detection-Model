@@ -24,7 +24,7 @@ import evaluator.lstm as evaluator
 
 class Transformer(nn.Module):
     def __init__(
-        self, embed_dim=32, num_heads=4, num_layers=4, mlp_hidden_dim=526, dropout=0.05
+        self, embed_dim=32, num_heads=4, num_layers=4, mlp_hidden_dim=526, dropout=0.025
     ):
         super(Transformer, self).__init__()
         encoder_layer = nn.TransformerEncoderLayer(
@@ -384,7 +384,7 @@ def eval(
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     lens = [32]
-    horizon_init = 10
+    horizon_init = 100
     horizon_increment = 10
     horizon_limit = 100
     epochs = 100

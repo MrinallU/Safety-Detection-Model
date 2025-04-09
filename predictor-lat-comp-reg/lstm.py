@@ -7,12 +7,19 @@ from torchvision import transforms
 import torch.nn.functional as F
 import os
 from PIL import Image
-from sklearn.metrics import accuracy_score, mean_squared_error
 from PIL import Image
 from torchvision.transforms import ToPILImage
 import numpy as np
 import sys
 import os
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    confusion_matrix,
+    precision_score,
+    recall_score,
+    mean_squared_error,
+)
 
 # Get the absolute path of the parent directory
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -370,9 +377,38 @@ def eval(
 
     all_safety_preds = [1 if item > 0.5 else 0 for item in all_safety_preds]
     accuracy = accuracy_score(all_safety_preds, all_safety_actuals)
+    f1 = f1_score(all_safety_actuals, all_safety_preds, zero_division=0)
+
+    # confusion_matrix returns a 2x2 matrix in the format:
+    # [[TN, FP],
+    #  [FN, TP]]
+    tn, fp, fn, tp = confusion_matrix(all_safety_actuals, all_safety_preds).ravel()
+
+    # False Positive Rate (FPR) = FP / (FP + TN)
+    if (fp + tn) == 0:
+        fpr = 0.0
+    else:
+        fpr = fp / (fp + tn)
+
+    # False Negative Rate (FNR) = FN / (FN + TP)
+    if (fn + tp) == 0:
+        fnr = 0.0
+    else:
+        fnr = fn / (fn + tp)
+
+    precision = precision_score(all_safety_actuals, all_safety_preds, zero_division=0)
+    recall = recall_score(all_safety_actuals, all_safety_preds, zero_division=0)
+
+    print(f"Accuracy:            {accuracy:.4f}")
+    print(f"F1 Score:            {f1:.4f}")
+    print(f"Precision:           {precision:.4f}")
+    print(f"Recall:              {recall:.4f}")
+    print(f"False Positive Rate: {fpr:.4f}")
+    print(f"False Negaitve Rate: {fnr:.4f}")
     print(f"Accuracy: {accuracy}")
     print(f"MSE: {mse_val:.4f}")
-    return mse_val, accuracy
+
+    return accuracy, f1, fpr, fnr, precision, recall, mse_val
 
 
 if __name__ == "__main__":
@@ -390,10 +426,11 @@ if __name__ == "__main__":
         for l in lens:
             print(f"Results for Horizon {h} and Sequence Length {l}:")
             print("_______________________________________________")
-            model.train_model(
-                data=data, seq_len=l, horizon=h, device=device, epochs=epochs
-            )
-            mse, acc = eval(
+            # model.train_model(
+            #     data=data, seq_len=l, horizon=h, device=device, epochs=epochs
+            # )
+
+            acc, f1, fpr, fnr, p, r, mse = eval(
                 load_lstm_weights=True,
                 load_d=False,
                 data=data,
@@ -402,9 +439,13 @@ if __name__ == "__main__":
                 device=device,
                 lstm_weights=f"./weights/lstm_weights{h}.pth",
             )
-
             with open("./reliability_results/accuracy.txt", "a") as file:
                 file.write(f"Results for Horizon {h} and Sequence Length {l}:\n")
                 file.write("_______________________________________________\n")
+                file.write(f"Accuracy: {acc:.4f} \n")
+                file.write(f"F1 Score: {f1:.4f} \n")
+                file.write(f"Precision: {p: .4f}\n")
+                file.write(f"Recall: {r: .4f}\n")
                 file.write(f"MSE: {mse: .4f}\n")
-                file.write(f"Accuracy: {acc: .4f}\n")
+                file.write(f"False Positive Rate: {fpr:.4f}\n")
+                file.write(f"False Negative Rate: {fnr:.4f}\n")
