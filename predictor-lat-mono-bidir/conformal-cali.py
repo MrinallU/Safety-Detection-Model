@@ -209,7 +209,7 @@ if __name__ == "__main__":
     ece2 = []
     mce = []
     mce2 = []
-    for i in range(10, 91, 10):
+    for i in range(100, 101, 10):
         print(i)
         a, b, c, d = main(i, testpath, validpath)
         ece2.append(b)

@@ -407,9 +407,9 @@ if __name__ == "__main__":
     # Grid Search
     # Hyperparameters
     lens = [32]
-    horizon_init = 10
+    horizon_init = 100
     horizon_increment = 10
-    horizon_limit = 40
+    horizon_limit = 100
 
     # Training
     data = load_data(device=device_choice)

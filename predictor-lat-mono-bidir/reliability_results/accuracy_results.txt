@@ -81,3 +81,12 @@ MSE:  0.3368
 False Positive Rate: 0.4754
 False Negative Rate: 0.2332
 
+Results for Horizon 100 and Sequence Length 32:
+_______________________________________________
+Accuracy: 0.6287 
+F1 Score: 0.6833 
+Precision:  0.6675
+Recall:  0.6998
+MSE:  0.3713
+False Positive Rate: 0.4664
+False Negative Rate: 0.3002
