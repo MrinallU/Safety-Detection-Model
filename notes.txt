@@ -1,8 +1,0 @@
-Bidirectional lstm preforms better on smaller horizons rather than larger 
-horizions, this could be because smaller timestep gaps are more dependent on the 
-prior 3 seconds on context given. Larger timesteps, on the other hand, have likely 
-already stabilized any driving done on the inital data given, making it somewhat unessecary 
-for bidirectional context??
-
-
-Increase epochs to 200 and run.
